@@ -1,27 +1,24 @@
-# ── Backend Dockerfile ──────────────────────────────────────────────────────
-# Python 3.12, uv package manager, FastAPI on port 8000
-# Place this file at: make_your_own_adv/backend/Dockerfile
-# ─────────────────────────────────────────────────────────────────────────────
-
 FROM python:3.12-slim
 
-# Install uv via pip (avoids external image copy)
 RUN pip install uv --no-cache-dir
 
 WORKDIR /app
 
-# Copy dependency files first (layer cache)
 COPY pyproject.toml uv.lock ./
-
-# Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project
 
-# Copy application source
 COPY . .
 
-# Directory for SQLite persistent volume
-RUN mkdir -p /data
+RUN mkdir -p /data \
+    && groupadd --gid 10001 appgroup \
+    && useradd --uid 10001 --gid 10001 --create-home appuser \
+    && chown -R 10001:10001 /app /data
+
+ENV UV_CACHE_DIR=/tmp/uv-cache \
+    PYTHONUNBUFFERED=1
+
+USER 10001
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--frozen", "--no-sync", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
